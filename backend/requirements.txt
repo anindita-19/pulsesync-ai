@@ -46,3 +46,6 @@ chromadb>=0.5.0
 
 # ─── Image Processing (optional, for OCR pipeline) ───────────────────
 Pillow==10.4.0
+
+# Logging / Monitoring
+structlog==24.4.0

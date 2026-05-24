@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.pyc
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+*.local
+
+# Env files (never commit real secrets)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Keep examples
+!.env.example
+
+# ChromaDB
+chroma_data/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+*.env.docker
+
+# Test
+coverage/
+.pytest_cache/
+htmlcov/

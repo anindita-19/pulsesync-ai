@@ -1,63 +1,66 @@
 """
-Application settings using Pydantic BaseSettings.
-Values are loaded from environment variables / .env file.
+PulseSync AI — Application Settings
+Pydantic-based environment configuration.
 """
+
+import os
 from pydantic_settings import BaseSettings
-from typing import List
+from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # ── App ──────────────────────────────────────────────────────────────
-    APP_NAME: str = "PulseSync AI"
-    APP_ENV: str = "development"
-    DEBUG: bool = True
-    API_V1_PREFIX: str = "/api/v1"
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    # App
+    app_name: str = "PulseSync AI"
+    app_env: str = "development"
+    debug: bool = True
+    api_prefix: str = "/api/v1"
+    allowed_origins: str = "http://localhost:3000"
 
-    # ── Auth ─────────────────────────────────────────────────────────────
-    JWT_SECRET_KEY: str = "change-me-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # JWT
+    jwt_secret_key: str = "change-this-secret-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 30
 
-    # ── MongoDB ──────────────────────────────────────────────────────────
-    MONGODB_URL: str = "mongodb://localhost:27017"
-    MONGODB_DB_NAME: str = "pulsesync_ai"
+    # MongoDB
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_db_name: str = "pulsesync_ai"
 
-    # ── Redis ─────────────────────────────────────────────────────────────
-    REDIS_URL: str = "redis://localhost:6379"
-    REDIS_PASSWORD: str = ""
+    # Redis
+    redis_url: str = "redis://localhost:6379"
+    redis_password: str = ""
 
-    # ── Cloudinary ────────────────────────────────────────────────────────
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
-    CLOUDINARY_UPLOAD_FOLDER: str = "pulsesync/reports"
+    # Groq
+    groq_api_key: str = ""
 
-    # ── Google OAuth ──────────────────────────────────────────────────────
-    GOOGLE_CLIENT_ID: str = ""
-    GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:3000/auth/google/callback"
+    # Google
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:3000/auth/google/callback"
+    google_places_api_key: str = ""
 
-    # ── Google Places ─────────────────────────────────────────────────────
-    GOOGLE_PLACES_API_KEY: str = ""
+    # Cloudinary
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_upload_folder: str = "pulsesync/reports"
 
-    # ── ChromaDB ──────────────────────────────────────────────────────────
-    CHROMA_PERSIST_DIR: str = "./chroma_data"
-    CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8001
-
-    # ── Rate Limiting ─────────────────────────────────────────────────────
-    RATE_LIMIT_PER_MINUTE: int = 60
+    # ChromaDB
+    chroma_persist_dir: str = "./chroma_data"
 
     @property
-    def allowed_origins_list(self) -> List[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",")]
 
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        case_sensitive = True
+        case_sensitive = False
 
 
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()

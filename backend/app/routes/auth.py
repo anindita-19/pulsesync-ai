@@ -42,9 +42,8 @@ def _make_token_response(user: dict) -> dict:
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignupRequest):
-    db = get_database()
+    db = await get_database()
 
-    # Check existing email
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -62,14 +61,13 @@ async def signup(payload: SignupRequest):
             "explanation_level": 1,
             "theme": "light",
         },
-        "created_at": __import__("datetime").datetime.now(timezone.utc),
-        "updated_at": __import__("datetime").datetime.now(timezone.utc),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
     result = await db.users.insert_one(user_doc)
     user_doc["_id"] = result.inserted_id
 
-    # Log signup event
     await log_event(str(result.inserted_id), "profile_update", "Account created", "Welcome to PulseSync AI!")
 
     return _make_token_response(user_doc)
@@ -79,7 +77,7 @@ async def signup(payload: SignupRequest):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest):
-    db = get_database()
+    db = await get_database()
 
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user:
@@ -102,17 +100,16 @@ async def login(payload: LoginRequest):
 @router.post("/google", response_model=TokenResponse)
 async def google_auth(payload: GoogleAuthRequest):
     """Exchange Google authorization code for tokens, create or login user."""
-    db = get_database()
+    db = await get_database()
 
-    # Exchange code for Google access token
     async with httpx.AsyncClient() as client:
         token_response = await client.post(
             "https://oauth2.googleapis.com/token",
             data={
                 "code": payload.code,
-                "client_id": settings.GOOGLE_CLIENT_ID,
-                "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "redirect_uri": settings.google_redirect_uri,
                 "grant_type": "authorization_code",
             },
         )
@@ -122,7 +119,6 @@ async def google_auth(payload: GoogleAuthRequest):
         token_data = token_response.json()
         google_access_token = token_data.get("access_token")
 
-        # Get Google user info
         userinfo_response = await client.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {google_access_token}"},
@@ -136,11 +132,9 @@ async def google_auth(payload: GoogleAuthRequest):
     email = google_user.get("email", "").lower()
     full_name = google_user.get("name", "")
 
-    # Check if user exists
     user = await db.users.find_one({"$or": [{"google_id": google_id}, {"email": email}]})
 
     if user:
-        # Update google_id if missing
         if not user.get("google_id"):
             await db.users.update_one(
                 {"_id": user["_id"]},
@@ -148,7 +142,6 @@ async def google_auth(payload: GoogleAuthRequest):
             )
             user["google_id"] = google_id
     else:
-        # Create new user
         user_doc = {
             "full_name": full_name,
             "email": email,
@@ -161,8 +154,8 @@ async def google_auth(payload: GoogleAuthRequest):
                 "notifications": {"ai_recommendations": True, "report_analysis": True, "health_alerts": True, "weekly_summary": True},
                 "explanation_level": 1,
             },
-            "created_at": __import__("datetime").datetime.now(timezone.utc),
-            "updated_at": __import__("datetime").datetime.now(timezone.utc),
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
         result = await db.users.insert_one(user_doc)
         user_doc["_id"] = result.inserted_id
@@ -175,7 +168,7 @@ async def google_auth(payload: GoogleAuthRequest):
 
 @router.post("/refresh")
 async def refresh_token(payload: RefreshTokenRequest):
-    db = get_database()
+    db = await get_database()
     decoded = decode_token(payload.refresh_token)
 
     if decoded.get("type") != "refresh":
@@ -194,7 +187,6 @@ async def refresh_token(payload: RefreshTokenRequest):
 
 @router.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    # In production: add token to blacklist in Redis
     return {"message": "Logged out successfully"}
 
 

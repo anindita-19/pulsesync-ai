@@ -15,7 +15,6 @@ PLACES_BASE = "https://maps.googleapis.com/maps/api/place"
 
 
 def _format_hospital(place: dict, user_lat: float = None, user_lng: float = None) -> dict:
-    """Normalize Google Places result to our API contract."""
     location = place.get("geometry", {}).get("location", {})
     phone = place.get("formatted_phone_number", "")
     return {
@@ -44,8 +43,7 @@ def _infer_type(types: list) -> str:
 
 
 async def _places_nearby(lat: float, lng: float, type_kw: str, radius: int = 10000) -> list:
-    """Call Google Places Nearby Search."""
-    if not settings.GOOGLE_PLACES_API_KEY:
+    if not settings.google_places_api_key:
         return []
 
     url = f"{PLACES_BASE}/nearbysearch/json"
@@ -53,7 +51,7 @@ async def _places_nearby(lat: float, lng: float, type_kw: str, radius: int = 100
         "location": f"{lat},{lng}",
         "radius": radius,
         "type": type_kw,
-        "key": settings.GOOGLE_PLACES_API_KEY,
+        "key": settings.google_places_api_key,
     }
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -66,12 +64,11 @@ async def _places_nearby(lat: float, lng: float, type_kw: str, radius: int = 100
 
 
 async def _places_text_search(query: str, lat: float = None, lng: float = None) -> list:
-    """Call Google Places Text Search."""
-    if not settings.GOOGLE_PLACES_API_KEY:
+    if not settings.google_places_api_key:
         return []
 
     url = f"{PLACES_BASE}/textsearch/json"
-    params = {"query": f"{query} hospital clinic", "key": settings.GOOGLE_PLACES_API_KEY}
+    params = {"query": f"{query} hospital clinic", "key": settings.google_places_api_key}
     if lat and lng:
         params["location"] = f"{lat},{lng}"
         params["radius"] = 20000
@@ -95,7 +92,6 @@ async def get_nearby_hospitals(
 ):
     type_kw = type or "hospital"
     raw = await _places_nearby(lat, lng, type_kw, radius * 1000)
-
     hospitals = [_format_hospital(p, lat, lng) for p in raw]
     start = (page - 1) * limit
     return {"hospitals": hospitals[start:start + limit], "total": len(hospitals)}
@@ -133,7 +129,6 @@ async def get_specialist_recommendations(
     lng: Optional[float] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return specialist recommendations based on user's health profile."""
     profile = current_user.get("profile", {})
     diseases = profile.get("existing_diseases", [])
     recommendations = []
@@ -158,7 +153,6 @@ async def get_specialist_recommendations(
                     "based_on": disease,
                 })
 
-    # Always recommend GP
     if not recommendations:
         recommendations.append({
             "specialty": "General Practitioner",
@@ -174,15 +168,14 @@ async def get_hospital(
     hospital_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get detailed info for a specific hospital by place_id."""
-    if not settings.GOOGLE_PLACES_API_KEY:
+    if not settings.google_places_api_key:
         raise HTTPException(status_code=503, detail="Google Places API not configured")
 
     url = f"{PLACES_BASE}/details/json"
     params = {
         "place_id": hospital_id,
         "fields": "name,formatted_address,formatted_phone_number,opening_hours,rating,geometry,website,types",
-        "key": settings.GOOGLE_PLACES_API_KEY,
+        "key": settings.google_places_api_key,
     }
 
     async with httpx.AsyncClient(timeout=10) as client:

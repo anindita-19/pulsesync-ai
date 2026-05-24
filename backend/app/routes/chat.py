@@ -22,14 +22,12 @@ def serialize_msg(m: dict) -> dict:
     return m
 
 
-# ── REST: Session management ──────────────────────────────────────────────────
-
 @router.post("/sessions")
 async def create_session(
     payload: CreateSessionRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     doc = {
@@ -54,7 +52,7 @@ async def get_sessions(
     limit: int = 20,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -70,7 +68,7 @@ async def get_sessions(
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     await db.chat_sessions.delete_one({"_id": ObjectId(session_id), "user_id": user_id})
     await db.chat_messages.delete_many({"session_id": session_id})
@@ -84,10 +82,9 @@ async def get_messages(
     limit: int = 50,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
-    # Verify session belongs to user
     session = await db.chat_sessions.find_one({"_id": ObjectId(session_id), "user_id": user_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -109,15 +106,13 @@ async def send_message_rest(
     payload: SendMessageRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """REST fallback for sending a message (non-streaming)."""
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     session = await db.chat_sessions.find_one({"_id": ObjectId(session_id), "user_id": user_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Save user message
     user_msg = {
         "session_id": session_id,
         "role": "user",
@@ -127,7 +122,6 @@ async def send_message_rest(
     }
     await db.chat_messages.insert_one(user_msg)
 
-    # Placeholder AI response — replace with LangGraph pipeline
     ai_content = f"[AI response to: {payload.content[:80]}...]\n\nNote: LLM integration pending. This is a placeholder response from the PulseSync AI backend."
 
     ai_msg = {
@@ -147,8 +141,6 @@ async def send_message_rest(
 
 @router.get("/sessions/{session_id}/suggestions")
 async def get_suggestions(session_id: str, current_user: dict = Depends(get_current_user)):
-    """Return conversation suggestion chips based on session context."""
-    # TODO: Generate dynamically based on recent messages and health profile
     return {
         "suggestions": [
             "What does my latest report say?",
@@ -159,7 +151,7 @@ async def get_suggestions(session_id: str, current_user: dict = Depends(get_curr
     }
 
 
-# ── WebSocket: Real-time chat ─────────────────────────────────────────────────
+# ── WebSocket ─────────────────────────────────────────────────────────────────
 
 @router.websocket("/ws")
 async def websocket_chat(
@@ -167,10 +159,6 @@ async def websocket_chat(
     token: str = Query(...),
     session_id: str = Query(None),
 ):
-    """
-    WebSocket endpoint for real-time AI chat streaming.
-    Relays Redis Pub/Sub events (agent activity, tokens) to the client.
-    """
     user = await get_current_user_ws(token)
     if not user:
         await websocket.close(code=4001)
@@ -214,17 +202,9 @@ async def handle_chat_message(
     explanation_level: int,
     message_id: str,
 ):
-    """
-    Process a WebSocket chat message:
-    1. Save user message to MongoDB
-    2. Trigger mock agent activity via Redis Pub/Sub
-    3. Publish streaming tokens (placeholder)
-    4. Save AI response and publish completion event
-    """
-    db = get_database()
+    db = await get_database()
     user_id = str(user["_id"])
 
-    # 1. Save user message
     user_msg = {
         "session_id": session_id,
         "role": "user",
@@ -234,11 +214,8 @@ async def handle_chat_message(
     }
     await db.chat_messages.insert_one(user_msg)
 
-    # 2. Trigger mock agents (publishes to Redis)
     await trigger_mock_agents(session_id, content)
 
-    # 3. Build placeholder AI response
-    # TODO: Replace with actual LangGraph / LLM streaming call
     placeholder_response = (
         f"This is a placeholder AI response.\n\n"
         f"You asked: \"{content[:100]}\"\n\n"
@@ -246,12 +223,10 @@ async def handle_chat_message(
         f"Your health profile and uploaded reports will be used as context for a fully personalized response."
     )
 
-    # 4. Publish tokens word by word (simulating streaming)
     words = placeholder_response.split(" ")
     for word in words:
         await redis_manager.publish_chat_token(session_id, message_id, word + " ")
 
-    # 5. Save AI message
     ai_msg = {
         "session_id": session_id,
         "role": "assistant",
@@ -263,13 +238,11 @@ async def handle_chat_message(
     }
     await db.chat_messages.insert_one(ai_msg)
 
-    # Update session message count
     await db.chat_sessions.update_one(
         {"_id": ObjectId(session_id)},
         {"$inc": {"message_count": 2}, "$set": {"updated_at": datetime.now(timezone.utc)}},
     )
 
-    # 6. Publish completion event
     await redis_manager.publish_chat_complete(
         session_id,
         message_id,

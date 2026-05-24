@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 # Configure Cloudinary
 cloudinary.config(
-    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-    api_key=settings.CLOUDINARY_API_KEY,
-    api_secret=settings.CLOUDINARY_API_SECRET,
+    cloud_name=settings.cloudinary_cloud_name,
+    api_key=settings.cloudinary_api_key,
+    api_secret=settings.cloudinary_api_secret,
     secure=True,
 )
 
@@ -31,7 +31,7 @@ async def upload_report(
     """
     is_pdf = file_type == "application/pdf"
 
-    folder = f"{settings.CLOUDINARY_UPLOAD_FOLDER}/{user_id}"
+    folder = f"{settings.cloudinary_upload_folder}/{user_id}"
 
     upload_options = {
         "folder": folder,

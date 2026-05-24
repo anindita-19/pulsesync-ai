@@ -24,7 +24,7 @@ from app.routes.history import router as history_router
 from app.routes.hospitals import router as hospitals_router
 
 logging.basicConfig(
-    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
+    level=logging.INFO if not settings.debug else logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ── Lifespan (startup/shutdown) ───────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"Starting {settings.APP_NAME}...")
+    logger.info(f"Starting {settings.app_name}...")
     await connect_db()
     try:
         await redis_manager.connect()
@@ -50,11 +50,11 @@ async def lifespan(app: FastAPI):
 
 # ── App instance ──────────────────────────────────────────────────────────────
 app = FastAPI(
-    title=f"{settings.APP_NAME} API",
+    title=f"{settings.app_name} API",
     description="AI-Powered Healthcare Intelligence Platform API",
     version="1.0.0",
-    docs_url="/api/docs" if settings.DEBUG else None,
-    redoc_url="/api/redoc" if settings.DEBUG else None,
+    docs_url="/api/docs" if settings.debug else None,
+    redoc_url="/api/redoc" if settings.debug else None,
     lifespan=lifespan,
 )
 
@@ -88,7 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-PREFIX = settings.API_V1_PREFIX
+PREFIX = settings.api_prefix
 
 app.include_router(auth_router, prefix=PREFIX)
 app.include_router(users_router, prefix=PREFIX)
@@ -109,16 +109,16 @@ from app.routes.chat import router as ws_router
 async def health_check():
     return {
         "status": "healthy",
-        "service": settings.APP_NAME,
+        "service": settings.app_name,
         "version": "1.0.0",
-        "environment": settings.APP_ENV,
+        "environment": settings.app_env,
     }
 
 
 @app.get("/")
 async def root():
     return {
-        "message": f"Welcome to {settings.APP_NAME} API",
+        "message": f"Welcome to {settings.app_name} API",
         "docs": "/api/docs",
         "version": "1.0.0",
     }

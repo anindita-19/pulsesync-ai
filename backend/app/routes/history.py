@@ -37,7 +37,7 @@ async def get_timeline(
     type: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -60,7 +60,7 @@ async def log_symptom(
     payload: SymptomLogRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     doc = {
@@ -84,7 +84,7 @@ async def get_symptoms(
     limit: int = 20,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -103,7 +103,7 @@ async def add_medication(
     payload: MedicationRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     doc = {
@@ -125,7 +125,7 @@ async def get_medications(
     active: Optional[bool] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -148,7 +148,7 @@ async def get_health_trends(
     period: str = "90d",
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     days = {"30d": 30, "90d": 90, "180d": 180, "1y": 365}.get(period, 90)
@@ -174,7 +174,6 @@ async def get_health_trends(
 
 @router.get("/risk-analytics")
 async def get_risk_analytics(current_user: dict = Depends(get_current_user)):
-    """Return risk factors for the user based on profile and history."""
     profile = current_user.get("profile", {})
     risk_factors = []
 

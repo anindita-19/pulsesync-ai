@@ -13,8 +13,6 @@ from app.services.history_service import log_event
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-# ── Profile ───────────────────────────────────────────────────────────────────
-
 @router.get("/profile")
 async def get_profile(current_user: dict = Depends(get_current_user)):
     return serialize_user(current_user)
@@ -25,7 +23,7 @@ async def complete_profile(
     payload: CompleteProfileRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     profile = {
@@ -72,14 +70,13 @@ async def update_profile(
     payload: UpdateProfileRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     update_fields = {"updated_at": datetime.now(timezone.utc)}
 
     if payload.full_name:
         update_fields["full_name"] = payload.full_name
 
     if payload.profile:
-        # Merge profile fields, don't overwrite entire profile
         profile_data = payload.profile.model_dump(exclude_none=True)
         for k, v in profile_data.items():
             update_fields[f"profile.{k}"] = v
@@ -114,8 +111,6 @@ async def get_profile_completion(current_user: dict = Depends(get_current_user))
     return {"completion_percentage": pct, "profile_completed": current_user.get("profile_completed", False)}
 
 
-# ── Settings ──────────────────────────────────────────────────────────────────
-
 @router.get("/settings")
 async def get_settings(current_user: dict = Depends(get_current_user)):
     return current_user.get("settings", {})
@@ -126,7 +121,7 @@ async def update_settings(
     payload: UserSettingsRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     update_data = payload.model_dump(exclude_none=True)
     set_fields = {f"settings.{k}": v for k, v in update_data.items()}
     set_fields["updated_at"] = datetime.now(timezone.utc)
@@ -136,15 +131,13 @@ async def update_settings(
     return updated.get("settings", {})
 
 
-# ── Notifications ─────────────────────────────────────────────────────────────
-
 @router.get("/notifications")
 async def get_notifications(
     page: int = 1,
     limit: int = 20,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -165,7 +158,7 @@ async def mark_notification_read(
     notification_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     await db.notifications.update_one(
         {"_id": ObjectId(notification_id), "user_id": user_id},
@@ -176,7 +169,7 @@ async def mark_notification_read(
 
 @router.patch("/notifications/read-all")
 async def mark_all_read(current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     await db.notifications.update_many({"user_id": user_id}, {"$set": {"read": True}})
     return {"success": True}

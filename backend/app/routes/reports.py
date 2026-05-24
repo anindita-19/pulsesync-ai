@@ -33,21 +33,17 @@ async def upload_medical_report(
     hospital_name: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
-    # Validate file type
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
 
-    # Read file content
     content = await file.read()
 
-    # Size check
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File exceeds 20MB limit")
 
-    # Upload to Cloudinary
     upload_result = await upload_report(
         file_content=content,
         file_name=file.filename,
@@ -55,7 +51,6 @@ async def upload_medical_report(
         user_id=user_id,
     )
 
-    # Save to MongoDB
     doc = {
         "user_id": user_id,
         "file_url": upload_result["file_url"],
@@ -76,7 +71,6 @@ async def upload_medical_report(
     result = await db.reports.insert_one(doc)
     doc["_id"] = result.inserted_id
 
-    # Log to history
     await log_event(
         user_id,
         "report_upload",
@@ -98,7 +92,7 @@ async def get_reports(
     search: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
     skip = (page - 1) * limit
 
@@ -121,11 +115,11 @@ async def get_reports(
     return {"reports": reports, "total": total, "page": page, "limit": limit}
 
 
-# ── Get single ────────────────────────────────────────────────────────────────
+# ── Timeline ──────────────────────────────────────────────────────────────────
 
 @router.get("/timeline")
 async def get_report_timeline(current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     cursor = db.reports.find({"user_id": user_id}).sort("report_date", 1)
@@ -143,7 +137,7 @@ async def get_report_timeline(current_user: dict = Depends(get_current_user)):
 
 @router.get("/{report_id}")
 async def get_report(report_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     report = await db.reports.find_one({"_id": ObjectId(report_id), "user_id": user_id})
@@ -156,50 +150,45 @@ async def get_report(report_id: str, current_user: dict = Depends(get_current_us
 
 @router.delete("/{report_id}")
 async def delete_report_route(report_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     report = await db.reports.find_one({"_id": ObjectId(report_id), "user_id": user_id})
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    # Delete from Cloudinary
     try:
         resource_type = "raw" if report.get("file_type") == "application/pdf" else "image"
         await delete_report(report["public_id"], resource_type)
     except Exception:
-        pass  # Continue even if Cloudinary delete fails
+        pass
 
     await db.reports.delete_one({"_id": ObjectId(report_id)})
     return {"success": True, "message": "Report deleted"}
 
 
-# ── Analysis placeholder ──────────────────────────────────────────────────────
+# ── Analysis ──────────────────────────────────────────────────────────────────
 
 @router.post("/{report_id}/analyze")
 async def request_analysis(report_id: str, current_user: dict = Depends(get_current_user)):
-    """Request AI analysis for a report. LangGraph pipeline to be integrated here."""
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     report = await db.reports.find_one({"_id": ObjectId(report_id), "user_id": user_id})
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    # Mark as processing
     await db.reports.update_one(
         {"_id": ObjectId(report_id)},
         {"$set": {"analysis_status": "processing", "updated_at": datetime.now(timezone.utc)}},
     )
 
-    # TODO: Trigger LangGraph pipeline via Celery/background task
-    # For now: return accepted status
     return {"status": "processing", "message": "Analysis queued"}
 
 
 @router.get("/{report_id}/analysis")
 async def get_report_analysis(report_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     analysis = await db.report_analysis.find_one({"report_id": report_id, "user_id": user_id})

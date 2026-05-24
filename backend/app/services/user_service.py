@@ -39,12 +39,11 @@ async def calculate_health_score(user_id: str) -> int:
 
     This is a placeholder — replace with ML model output when available.
     """
-    db = get_database()
+    db = await get_database()
     oid = ObjectId(user_id)
 
     score = 60  # base score
 
-    # Profile completeness
     user = await db.users.find_one({"_id": oid})
     if not user:
         return score
@@ -54,16 +53,13 @@ async def calculate_health_score(user_id: str) -> int:
     filled = sum(1 for f in fields if profile.get(f))
     score += filled * 3  # up to +15
 
-    # BMI bonus
     bmi = await calculate_bmi(user)
     if bmi and 18.5 <= bmi <= 24.9:
         score += 10
     elif bmi and 25 <= bmi <= 29.9:
         score += 5
 
-    # Report uploads
     report_count = await db.reports.count_documents({"user_id": user_id})
     score += min(report_count * 2, 10)
 
-    # Clamp to 0-100
     return max(0, min(100, score))

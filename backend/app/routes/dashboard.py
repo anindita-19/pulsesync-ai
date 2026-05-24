@@ -11,26 +11,21 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("")
 async def get_dashboard(current_user: dict = Depends(get_current_user)):
-    """Full dashboard summary."""
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
-    # Health score
     health_score = await calculate_health_score(user_id)
     bmi = await calculate_bmi(current_user)
 
-    # Recent reports
     recent_reports = []
     cursor = db.reports.find({"user_id": user_id}).sort("created_at", -1).limit(5)
     async for r in cursor:
         r["_id"] = str(r["_id"])
         recent_reports.append(r)
 
-    # Total reports & AI interactions
     total_reports = await db.reports.count_documents({"user_id": user_id})
     ai_interactions = await db.chat_sessions.count_documents({"user_id": user_id})
 
-    # Risk indicators based on profile
     profile = current_user.get("profile", {})
     risk_indicators = _calculate_risk_indicators(profile, bmi)
 
@@ -58,14 +53,12 @@ async def get_health_metrics(
     period: str = "30d",
     current_user: dict = Depends(get_current_user),
 ):
-    """Return health metric chart data for the given period."""
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     days = {"7d": 7, "30d": 30, "90d": 90, "180d": 180, "1y": 365}.get(period, 30)
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Fetch health_metrics records
     cursor = db.health_metrics.find(
         {"user_id": user_id, "recorded_at": {"$gte": since}}
     ).sort("recorded_at", 1)
@@ -83,8 +76,7 @@ async def get_health_metrics(
 
 @router.get("/recommendations")
 async def get_ai_recommendations(current_user: dict = Depends(get_current_user)):
-    """Fetch AI-generated recommendations stored for this user."""
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     cursor = db.ai_recommendations.find({"user_id": user_id}).sort("created_at", -1).limit(5)
@@ -101,7 +93,7 @@ async def get_recent_activity(
     limit: int = 10,
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_database()
+    db = await get_database()
     user_id = str(current_user["_id"])
 
     cursor = db.medical_history.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
